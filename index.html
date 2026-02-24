@@ -277,6 +277,134 @@
     color: var(--ink-dim);
   }
 
+  /* Solunar */
+  .solunar-timeline {
+    position: relative;
+    border: 1px solid var(--rule);
+    background: var(--paper-light);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .solunar-bar {
+    position: relative;
+    height: 48px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin: 1rem 0 .75rem;
+    overflow: hidden;
+  }
+  .solunar-period {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border-radius: 3px;
+  }
+  .solunar-major {
+    background: rgba(106, 172, 190, .25);
+    border: 1px solid rgba(106, 172, 190, .4);
+  }
+  .solunar-minor {
+    background: rgba(196, 149, 106, .18);
+    border: 1px solid rgba(196, 149, 106, .3);
+  }
+  .solunar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: .6rem;
+    color: var(--ink-faint);
+    letter-spacing: .08em;
+  }
+  .solunar-legend {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-top: .75rem;
+  }
+  .solunar-legend-item {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .solunar-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+  .solunar-rating {
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--rule);
+  }
+  .solunar-rating-label {
+    font-family: var(--mono);
+    font-size: .6rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .35rem;
+  }
+  .solunar-rating-stars {
+    font-size: 1.2rem;
+    letter-spacing: .15em;
+  }
+  .solunar-rating-text {
+    font-family: var(--body);
+    font-style: italic;
+    font-size: .8rem;
+    color: var(--ink-dim);
+    margin-top: .2rem;
+  }
+  .solunar-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-top: 1rem;
+  }
+  .solunar-detail-cell {
+    background: var(--paper-light);
+    padding: .75rem 1rem;
+    text-align: center;
+  }
+  .solunar-detail-label {
+    font-family: var(--mono);
+    font-size: .55rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .3rem;
+  }
+  .solunar-detail-time {
+    font-family: var(--serif);
+    font-size: 1.1rem;
+    color: var(--ink);
+  }
+  .solunar-detail-type {
+    font-family: var(--body);
+    font-style: italic;
+    font-size: .7rem;
+    margin-top: .15rem;
+  }
+  .solunar-detail-major { color: #6aacbe; }
+  .solunar-detail-minor { color: var(--accent); }
+
   /* Footer */
   .footer {
     margin-top: 3rem;
@@ -381,6 +509,140 @@ function getMoonPhase(date) {
   return { name, icon, age: Math.round(age * 10) / 10, illumination: Math.round((1 - Math.cos(phase * 2 * Math.PI)) / 2 * 100) };
 }
 
+// Solunar forecast: moon transit → major/minor feeding periods
+function calcSolunar(date, lat) {
+  // Approximate moon rise/set/transit using simplified algorithm
+  const J2000 = 2451545.0;
+  function toJD(d) {
+    return d.getTime() / 86400000 + 2440587.5;
+  }
+  function fromJD(jd) {
+    return new Date((jd - 2440587.5) * 86400000);
+  }
+
+  // Moon's approximate right ascension and declination
+  function moonPos(jd) {
+    const T = (jd - J2000) / 36525;
+    const L = (218.3165 + 481267.8813 * T) % 360; // mean longitude
+    const M = (134.9634 + 477198.8676 * T) % 360; // mean anomaly
+    const F = (93.2721 + 483202.0175 * T) % 360;  // argument of latitude
+    const D = (297.8502 + 445267.1115 * T) % 360;  // mean elongation
+    const Ms = (357.5291 + 35999.0503 * T) % 360;  // sun mean anomaly
+    const toR = Math.PI / 180;
+
+    let lon = L
+      + 6.289 * Math.sin(M * toR)
+      + 1.274 * Math.sin((2*D - M) * toR)
+      + 0.658 * Math.sin(2*D * toR)
+      + 0.214 * Math.sin(2*M * toR)
+      - 0.186 * Math.sin(Ms * toR)
+      - 0.114 * Math.sin(2*F * toR);
+    lon = ((lon % 360) + 360) % 360;
+
+    let lat2 = 5.128 * Math.sin(F * toR)
+      + 0.281 * Math.sin((M + F) * toR)
+      + 0.278 * Math.sin((2*D - F) * toR);
+
+    const obliq = 23.4393 - 0.013 * T;
+    const lonR = lon * toR, latR = lat2 * toR, oblR = obliq * toR;
+    const ra = Math.atan2(
+      Math.sin(lonR) * Math.cos(oblR) - Math.tan(latR) * Math.sin(oblR),
+      Math.cos(lonR)
+    ) * 180 / Math.PI;
+    const dec = Math.asin(
+      Math.sin(latR) * Math.cos(oblR) + Math.cos(latR) * Math.sin(oblR) * Math.sin(lonR)
+    ) * 180 / Math.PI;
+    return { ra: ((ra % 360) + 360) % 360, dec };
+  }
+
+  // Sidereal time at Greenwich
+  function gmst(jd) {
+    const T = (jd - J2000) / 36525;
+    let st = 280.46061837 + 360.98564736629 * (jd - J2000) + 0.000387933 * T * T;
+    return ((st % 360) + 360) % 360;
+  }
+
+  // Find moon transit (upper culmination) nearest to noon
+  const jd0 = Math.floor(toJD(date) - 0.5) + 0.5; // midnight JD
+  let transitJD = null;
+  // Search in 0.01-day increments
+  let bestHA = 999;
+  for (let f = 0; f < 1.2; f += 0.005) {
+    const jd = jd0 + f;
+    const mp = moonPos(jd);
+    const st = gmst(jd) + (-82.6715); // local sidereal time (longitude)
+    let ha = ((st - mp.ra) % 360 + 360) % 360;
+    if (ha > 180) ha -= 360;
+    if (Math.abs(ha) < bestHA) {
+      bestHA = Math.abs(ha);
+      transitJD = jd;
+    }
+  }
+
+  // Moon underfoot (opposite transit) ~12.4h offset
+  const HALF_LUNAR_DAY = 0.5 + 0.01; // ~12.4h in days ≈ 0.517
+  const underfootJD = transitJD < jd0 + 0.5 ? transitJD + HALF_LUNAR_DAY : transitJD - HALF_LUNAR_DAY;
+
+  // Moon rise/set: approximate by finding when altitude crosses 0
+  const latR = lat * Math.PI / 180;
+  function moonAlt(jd) {
+    const mp = moonPos(jd);
+    const st = gmst(jd) + (-82.6715);
+    const ha = (st - mp.ra) * Math.PI / 180;
+    const decR = mp.dec * Math.PI / 180;
+    return Math.asin(Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(ha)) * 180 / Math.PI;
+  }
+
+  let moonRiseJD = null, moonSetJD = null;
+  for (let f = 0; f < 1.2; f += 0.003) {
+    const jd1 = jd0 + f, jd2 = jd0 + f + 0.003;
+    const a1 = moonAlt(jd1), a2 = moonAlt(jd2);
+    if (a1 < 0 && a2 >= 0 && !moonRiseJD) {
+      moonRiseJD = jd1 + 0.003 * (-a1) / (a2 - a1);
+    }
+    if (a1 >= 0 && a2 < 0 && !moonSetJD) {
+      moonSetJD = jd1 + 0.003 * (a1) / (a1 - a2);
+    }
+  }
+
+  // Major periods: 2h centered on transit and underfoot
+  // Minor periods: 1h centered on moonrise and moonset
+  const MAJOR_HALF = 1 / 24; // 1h each side
+  const MINOR_HALF = 0.5 / 24; // 30min each side
+
+  const periods = [];
+  if (transitJD) {
+    periods.push({ type: 'major', label: 'Moon Overhead', center: fromJD(transitJD), start: fromJD(transitJD - MAJOR_HALF), end: fromJD(transitJD + MAJOR_HALF) });
+  }
+  if (underfootJD) {
+    periods.push({ type: 'major', label: 'Moon Underfoot', center: fromJD(underfootJD), start: fromJD(underfootJD - MAJOR_HALF), end: fromJD(underfootJD + MAJOR_HALF) });
+  }
+  if (moonRiseJD) {
+    periods.push({ type: 'minor', label: 'Moonrise', center: fromJD(moonRiseJD), start: fromJD(moonRiseJD - MINOR_HALF), end: fromJD(moonRiseJD + MINOR_HALF) });
+  }
+  if (moonSetJD) {
+    periods.push({ type: 'minor', label: 'Moonset', center: fromJD(moonSetJD), start: fromJD(moonSetJD - MINOR_HALF), end: fromJD(moonSetJD + MINOR_HALF) });
+  }
+
+  // Sort by start time
+  periods.sort((a, b) => a.start - b.start);
+
+  // Rating based on moon phase (full/new = best)
+  const moon = getMoonPhase(date);
+  let rating, ratingText;
+  if (moon.name === 'New Moon' || moon.name === 'Full Moon') {
+    rating = 5; ratingText = 'Excellent — peak solunar activity';
+  } else if (moon.name === 'First Quarter' || moon.name === 'Last Quarter') {
+    rating = 3; ratingText = 'Average — moderate feeding activity';
+  } else if (moon.age < 3 || moon.age > 27 || (moon.age > 13 && moon.age < 17)) {
+    rating = 4; ratingText = 'Good — strong feeding expected';
+  } else {
+    rating = 2; ratingText = 'Fair — light feeding periods';
+  }
+
+  return { periods, rating, ratingText };
+}
+
 async function init() {
   const now = new Date();
   const today = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
@@ -447,6 +709,55 @@ async function init() {
         <p>${moon.illumination}% illumination · Day ${moon.age} of cycle</p>
       </div>
     </div>`;
+
+    // Solunar forecast
+    const solunar = calcSolunar(now, LAT);
+    html += `<div class="section-head"><h2>🐟 Solunar Forecast</h2></div>`;
+    html += `<div class="solunar-timeline">`;
+
+    // Timeline bar: 24h from midnight to midnight
+    const dayStart = new Date(now); dayStart.setHours(0,0,0,0);
+    const dayEnd = new Date(now); dayEnd.setHours(23,59,59,999);
+    const dayMs = dayEnd - dayStart;
+
+    html += `<div class="solunar-bar">`;
+    for (const p of solunar.periods) {
+      const startPct = Math.max(0, (p.start - dayStart) / dayMs * 100);
+      const endPct = Math.min(100, (p.end - dayStart) / dayMs * 100);
+      const widthPct = endPct - startPct;
+      if (widthPct > 0) {
+        html += `<div class="solunar-period solunar-${p.type}" style="left:${startPct}%;width:${widthPct}%;" title="${p.label}: ${fmtTime(p.start)} – ${fmtTime(p.end)}">${p.type === 'major' ? 'MAJOR' : 'MINOR'}</div>`;
+      }
+    }
+    html += `</div>`;
+    html += `<div class="solunar-labels"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div>`;
+
+    html += `<div class="solunar-legend">
+      <div class="solunar-legend-item"><div class="solunar-legend-swatch" style="background:rgba(106,172,190,.25);border:1px solid rgba(106,172,190,.4);"></div> Major (2hr)</div>
+      <div class="solunar-legend-item"><div class="solunar-legend-swatch" style="background:rgba(196,149,106,.18);border:1px solid rgba(196,149,106,.3);"></div> Minor (1hr)</div>
+    </div>`;
+
+    // Detail grid
+    html += `<div class="solunar-detail-grid">`;
+    for (const p of solunar.periods) {
+      const cls = p.type === 'major' ? 'solunar-detail-major' : 'solunar-detail-minor';
+      html += `<div class="solunar-detail-cell">
+        <div class="solunar-detail-label">${p.label}</div>
+        <div class="solunar-detail-time">${fmtTime(p.start)} – ${fmtTime(p.end)}</div>
+        <div class="solunar-detail-type ${cls}">${p.type === 'major' ? '● Major Period' : '○ Minor Period'}</div>
+      </div>`;
+    }
+    html += `</div>`;
+
+    // Rating
+    const stars = '★'.repeat(solunar.rating) + '☆'.repeat(5 - solunar.rating);
+    html += `<div class="solunar-rating">
+      <div class="solunar-rating-label">Today's Fishing Rating</div>
+      <div class="solunar-rating-stars" style="color:var(--accent);">${stars}</div>
+      <div class="solunar-rating-text">${solunar.ratingText}</div>
+    </div>`;
+
+    html += `</div>`;
 
     // Conditions
     html += `
