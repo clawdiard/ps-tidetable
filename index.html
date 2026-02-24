@@ -665,20 +665,23 @@ async function init() {
     // Water temperature
     const waterTemp = waterTempData?.data?.[0]?.v ? parseFloat(waterTempData.data[0].v) : null;
 
-    // Red tide status via FWC HAB monitoring (Sarasota County area)
+    // Marine conditions via Open-Meteo marine API
+    let marineData = null;
+    try {
+      marineData = await fetchJSON('https://api.open-meteo.com/v1/marine?latitude=27.41&longitude=-82.67&current=wave_height,wave_period&daily=wave_height_max&timezone=America/New_York&forecast_days=1').catch(() => null);
+    } catch(e) { /* marine data unavailable */ }
+
+    // Red tide status — HABSOS API is not reliably accessible client-side (CORS),
+    // so we show marine wave conditions as a proxy for ocean health and note
+    // that users should check FWC's official HAB status page for red tide info.
     let redTideStatus = null;
     try {
-      const habData = await fetchJSON('https://api.open-meteo.com/v1/marine?latitude=27.41&longitude=-82.67&current=ocean_current_velocity&daily=wave_height_max&timezone=America/New_York&forecast_days=1').catch(() => null);
-      // FWC doesn't offer a public JSON API, so we derive a proxy status
-      // We'll fetch the NOAA HAB bulletin for Gulf coast
-      const habResp = await fetch('https://habsos.noaa.gov/api/v1/data?state=FL&region=Gulf+of+Mexico&format=json&limit=5&sort=-date').then(r => r.ok ? r.json() : null).catch(() => null);
-      if (habResp && habResp.length > 0) {
-        const latest = habResp[0];
-        const cellCount = latest.cellcount || latest.cell_count || 0;
-        if (cellCount > 1000000) redTideStatus = { level: 'High', color: '#e74c3c', desc: '>1M cells/L' };
-        else if (cellCount > 100000) redTideStatus = { level: 'Medium', color: '#f39c12', desc: '>100K cells/L' };
-        else if (cellCount > 10000) redTideStatus = { level: 'Low', color: '#f1c40f', desc: '>10K cells/L' };
-        else redTideStatus = { level: 'Not Present', color: '#27ae60', desc: 'Background levels' };
+      // Use wave height as a rough marine conditions indicator
+      const waveHeight = marineData?.current?.wave_height;
+      if (waveHeight != null) {
+        if (waveHeight > 2.0) redTideStatus = { level: 'Rough', color: '#e74c3c', desc: `Waves ${waveHeight}m — check FWC for HAB status` };
+        else if (waveHeight > 1.0) redTideStatus = { level: 'Moderate', color: '#f39c12', desc: `Waves ${waveHeight}m — check FWC for HAB status` };
+        else redTideStatus = { level: 'Calm', color: '#27ae60', desc: `Waves ${waveHeight}m — check FWC for HAB status` };
       }
     } catch(e) { /* red tide data unavailable */ }
 
