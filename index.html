@@ -650,10 +650,31 @@ async function init() {
   const endStr = `${end.getFullYear()}${pad(end.getMonth()+1)}${pad(end.getDate())}`;
 
   try {
-    const [tideData, weatherData] = await Promise.all([
+    const [tideData, weatherData, waterTempData] = await Promise.all([
       fetchJSON(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date=${today}&end_date=${endStr}&station=${NOAA_STATION}&product=predictions&datum=MLLW&time_zone=lst_ldt&units=english&interval=hilo&format=json`),
-      fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weathercode&current=temperature_2m,relative_humidity_2m,wind_speed_10m,apparent_temperature&hourly=temperature_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York&forecast_days=7`)
+      fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weathercode&current=temperature_2m,relative_humidity_2m,wind_speed_10m,apparent_temperature&hourly=temperature_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=America/New_York&forecast_days=7`),
+      fetchJSON(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=${NOAA_STATION}&product=water_temperature&units=english&time_zone=lst_ldt&format=json`).catch(() => null)
     ]);
+
+    // Water temperature
+    const waterTemp = waterTempData?.data?.[0]?.v ? parseFloat(waterTempData.data[0].v) : null;
+
+    // Red tide status via FWC HAB monitoring (Sarasota County area)
+    let redTideStatus = null;
+    try {
+      const habData = await fetchJSON('https://api.open-meteo.com/v1/marine?latitude=27.41&longitude=-82.67&current=ocean_current_velocity&daily=wave_height_max&timezone=America/New_York&forecast_days=1').catch(() => null);
+      // FWC doesn't offer a public JSON API, so we derive a proxy status
+      // We'll fetch the NOAA HAB bulletin for Gulf coast
+      const habResp = await fetch('https://habsos.noaa.gov/api/v1/data?state=FL&region=Gulf+of+Mexico&format=json&limit=5&sort=-date').then(r => r.ok ? r.json() : null).catch(() => null);
+      if (habResp && habResp.length > 0) {
+        const latest = habResp[0];
+        const cellCount = latest.cellcount || latest.cell_count || 0;
+        if (cellCount > 1000000) redTideStatus = { level: 'High', color: '#e74c3c', desc: '>1M cells/L' };
+        else if (cellCount > 100000) redTideStatus = { level: 'Medium', color: '#f39c12', desc: '>100K cells/L' };
+        else if (cellCount > 10000) redTideStatus = { level: 'Low', color: '#f1c40f', desc: '>10K cells/L' };
+        else redTideStatus = { level: 'Not Present', color: '#27ae60', desc: 'Background levels' };
+      }
+    } catch(e) { /* red tide data unavailable */ }
 
     const preds = tideData.predictions || [];
     const todayPreds = preds.filter(p => p.t.startsWith(today.substring(0,4) + '-' + today.substring(4,6) + '-' + today.substring(6,8)));
@@ -783,6 +804,20 @@ async function init() {
         <div class="cond-value">${Math.round(cur.wind_speed_10m)}</div>
         <div class="cond-unit">mph</div>
       </div>
+      ${waterTemp !== null ? `<div class="cond-cell">
+        <div class="cond-label">Water Temp</div>
+        <div class="cond-value" style="color:${waterTemp >= 75 ? '#27ae60' : waterTemp >= 65 ? '#f39c12' : '#3498db'}">${Math.round(waterTemp)}°</div>
+        <div class="cond-unit">°F · Gulf</div>
+      </div>` : ''}
+      ${redTideStatus ? `<div class="cond-cell">
+        <div class="cond-label">Red Tide</div>
+        <div class="cond-value" style="color:${redTideStatus.color};font-size:1.1rem;">${redTideStatus.level}</div>
+        <div class="cond-unit">${redTideStatus.desc}</div>
+      </div>` : `<div class="cond-cell">
+        <div class="cond-label">Red Tide</div>
+        <div class="cond-value" style="color:var(--ink-dim);">—</div>
+        <div class="cond-unit">Data unavailable</div>
+      </div>`}
     </div>`;
 
     // Today's tides
