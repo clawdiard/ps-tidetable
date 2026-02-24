@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0b09">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.svg">
 <title>TideTable — Longboat Key</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400&display=swap');
@@ -969,6 +975,27 @@ function drawTideChart(preds, now) {
     ctx.fillText('NOW', nowX, H - 8);
   }
 }
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// Offline banner
+window.addEventListener('online', () => {
+  const b = document.getElementById('offlineBanner');
+  if (b) b.remove();
+  init(); // refresh data
+});
+window.addEventListener('offline', () => {
+  if (!document.getElementById('offlineBanner')) {
+    const b = document.createElement('div');
+    b.id = 'offlineBanner';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c4956a;color:#0d0b09;text-align:center;padding:.5rem;font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;z-index:999;';
+    b.textContent = 'OFFLINE — SHOWING CACHED DATA';
+    document.body.prepend(b);
+  }
+});
 
 init();
 </script>
