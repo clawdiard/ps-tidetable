@@ -668,7 +668,7 @@ async function init() {
     // Marine conditions via Open-Meteo marine API
     let marineData = null;
     try {
-      marineData = await fetchJSON('https://api.open-meteo.com/v1/marine?latitude=27.41&longitude=-82.67&current=wave_height,wave_period&daily=wave_height_max&timezone=America/New_York&forecast_days=1').catch(() => null);
+      marineData = await fetchJSON('https://marine-api.open-meteo.com/v1/marine?latitude=27.41&longitude=-82.67&current=wave_height,wave_period&daily=wave_height_max&timezone=America/New_York&forecast_days=1').catch(() => null);
     } catch(e) { /* marine data unavailable */ }
 
     // Red tide status — HABSOS API is not reliably accessible client-side (CORS),
